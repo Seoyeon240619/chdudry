@@ -306,24 +306,44 @@ with col_strip:
         # student completed this problem (answers are kept)
         st.session_state.checked[idx] = True
 
-    # 모든 문제를 확인하면 전체 정답 보기 버튼을 표시
-    if all(st.session_state.checked) and not st.session_state.revealed_all:
-        if st.button("모든 문제 정답 보기"):
+    # 모든 문제를 확인하면 전체 정답 보기 버튼을 더 눈에 띄게, 다음문제 버튼 위쪽에 표시
+    show_reveal_btn = all(st.session_state.checked) and not st.session_state.revealed_all
+    if show_reveal_btn:
+        st.markdown("""
+            <div style='text-align:center; margin: 20px 0;'>
+                <button style='background-color:#ffeb3b; color:#222; font-size:1.2em; font-weight:bold; padding:0.7em 2em; border-radius:8px; border:none; cursor:pointer;' onclick="document.getElementById('reveal_all_btn').click();">모든 문제 정답 보기</button>
+            </div>
+            <input type='button' id='reveal_all_btn' style='display:none;'>
+        """, unsafe_allow_html=True)
+        # 실제 버튼은 st.button으로 처리 (위의 버튼 클릭 시 JS로 트리거)
+        if st.button("모든 문제 정답 보기", key="reveal_all_btn"):
             st.session_state.revealed_all = True
 
     if st.session_state.revealed_all:
         st.markdown("---")
-        st.header("정답 (모든 문제)")
+        st.markdown("<div style='background:#ffe082; padding:1em; border-radius:10px;'><h2 style='color:#222; text-align:center;'>전체 문제 결과 요약</h2></div>", unsafe_allow_html=True)
+        total_correct = 0
+        total_wrong = 0
         for p_idx, p in enumerate(PROBLEMS):
             st.subheader(f"문제 {p_idx+1}: {p['situation']}")
-            # render each sentence with teacher answers (reveal=True)
-            for s in p['sentences']:
-                # use the same render_sentence helper
-                # get the stored answers for that problem
-                stored_answers = st.session_state.problem_answers[p_idx]
-                st.markdown(render_sentence(s, stored_answers, reveal=True, words=p['words']))
-                # show student's filled sentence (their inputs)
-                st.markdown(f"**학생입력:** {render_sentence(s, stored_answers, reveal=False, words=p['words'])}")
+            stored_answers = st.session_state.problem_answers[p_idx]
+            for s_idx, s in enumerate(p['sentences']):
+                st.markdown(f"**문장:** {render_sentence(s, stored_answers, reveal=True, words=p['words'])}")
+                st.write("| 빈칸 | 학생 입력 | 정답 | 결과 |\n|---|---|---|---|")
+                placeholder_re = re.compile(r"\{(\d+)\}")
+                for m in placeholder_re.finditer(s):
+                    idxw = int(m.group(1))
+                    student = stored_answers[idxw] if idxw < len(stored_answers) else ""
+                    correct = p['words'][idxw] if idxw < len(p['words']) else ""
+                    norm_student = re.sub('[^a-z]', '', student.lower().strip())
+                    norm_correct = correct.lower()
+                    result = "✅" if norm_student == norm_correct else "❌"
+                    if result == "✅":
+                        total_correct += 1
+                    else:
+                        total_wrong += 1
+                    st.write(f"| {idxw+1} | {student} | {correct} | {result} |")
+        st.markdown(f"<div style='background:#fffde7; padding:0.7em; border-radius:8px; text-align:center; font-size:1.1em;'><b>총 맞은 개수:</b> {total_correct} / <b>총 틀린 개수:</b> {total_wrong}</div>", unsafe_allow_html=True)
 
     st.markdown("---")
     c_prev, c_next = st.columns([1, 1])
